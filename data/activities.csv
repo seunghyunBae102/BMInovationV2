@@ -1,0 +1,9 @@
+﻿ID,Name,Category,Intensity,Base_Reward,Cost,Stress_Cost,Tags
+ACT_GM_PVP,PVP 랭킹전,GAME,90,50.0,0,15.0,Competition|Skill
+ACT_GM_AUTO,자동사냥(방치),GAME,15,5.0,0,0.0,Growth|RPG
+ACT_GM_GACHA,확률형 아이템 뽑기,GAME,40,80.0,3000,-5.0,Gambling|Collection
+ACT_GM_AD,보상형 광고 시청,GAME,30,2.0,0,5.0,Free|Patience
+ACT_MD_SHORT,숏폼(틱톡/릴스),MEDIA,60,25.0,0,5.0,Humor|Trend
+ACT_CM_BOARD,커뮤니티 눈팅,COMM,40,10.0,0,10.0,Social|Info
+ACT_LF_WORK,집중 업무/공부,WORK,85,0.0,-200,20.0,Responsibility
+ACT_LF_REST,멍때리기/휴식,LIFE,5,1.0,0,-20.0,Relax
