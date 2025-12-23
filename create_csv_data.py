@@ -2,10 +2,12 @@ import pandas as pd
 import os
 
 # ==========================================
-# Initial Data Creator
+# Initial Data Creator v1.5
 # ==========================================
-# 이 스크립트는 시뮬레이션에 필요한 초기 CSV 파일들을
-# ./data 폴더에 생성합니다. (최초 1회 실행)
+# [Update Log]
+# - Media_Group: 매체 상위 분류 추가 (GAME, VIDEO, BOOK 등)
+# - Fun_Reward / Growth_Reward: 보상 이원화 (재미 vs 성장)
+# - Difficulty: 진입 장벽 (숙련도 요구치)
 # ==========================================
 
 def create_initial_csvs():
@@ -14,23 +16,71 @@ def create_initial_csvs():
         os.makedirs('data')
         print("Created directory: ./data")
 
-    # 1. Activity Table Data
+    # 1. Activity Table Data (Schema Updated)
     activities_data = [
-        {"ID": "ACT_GM_PVP",   "Name": "PVP 랭킹전",    "Category": "GAME", "Intensity": 90, "Base_Reward": 50.0, "Cost": 0,    "Stress_Cost": 15.0, "Tags": "Competition|Skill"},
-        {"ID": "ACT_GM_AUTO",  "Name": "자동사냥(방치)", "Category": "GAME", "Intensity": 15, "Base_Reward": 5.0,  "Cost": 0,    "Stress_Cost": 0.0,  "Tags": "Growth|RPG"},
-        {"ID": "ACT_GM_GACHA", "Name": "확률형 아이템 뽑기", "Category": "GAME", "Intensity": 40, "Base_Reward": 80.0, "Cost": 3000, "Stress_Cost": -5.0, "Tags": "Gambling|Collection"},
-        {"ID": "ACT_GM_AD",    "Name": "보상형 광고 시청", "Category": "GAME", "Intensity": 30, "Base_Reward": 2.0,  "Cost": 0,    "Stress_Cost": 5.0,  "Tags": "Free|Patience"},
-        {"ID": "ACT_MD_SHORT", "Name": "숏폼(틱톡/릴스)",  "Category": "MEDIA", "Intensity": 60, "Base_Reward": 25.0, "Cost": 0,    "Stress_Cost": 5.0,  "Tags": "Humor|Trend"},
-        {"ID": "ACT_CM_BOARD", "Name": "커뮤니티 눈팅",    "Category": "COMM",  "Intensity": 40, "Base_Reward": 10.0, "Cost": 0,    "Stress_Cost": 10.0, "Tags": "Social|Info"},
-        {"ID": "ACT_LF_WORK",  "Name": "집중 업무/공부",   "Category": "WORK",  "Intensity": 85, "Base_Reward": 0.0,  "Cost": -200, "Stress_Cost": 20.0, "Tags": "Responsibility"},
-        {"ID": "ACT_LF_REST",  "Name": "멍때리기/휴식",    "Category": "LIFE",  "Intensity": 5,  "Base_Reward": 1.0,  "Cost": 0,    "Stress_Cost": -20.0, "Tags": "Relax"},
+        # --- GAME (도파민 위주, 난이도 다양) ---
+        {
+            "ID": "ACT_GM_PVP", "Name": "PVP 랭킹전", "Category": "GAME", 
+            "Media_Group": "GAME", "Intensity": 90, "Fun_Reward": 60.0, "Growth_Reward": 5.0, "Difficulty": 70, # 이기기 어려움
+            "Cost": 0, "Stress_Cost": 20.0, "Tags": "Competition|Skill"
+        },
+        {
+            "ID": "ACT_GM_AUTO", "Name": "자동사냥(방치)", "Category": "GAME", 
+            "Media_Group": "GAME", "Intensity": 15, "Fun_Reward": 10.0, "Growth_Reward": 2.0, "Difficulty": 5, # 매우 쉬움
+            "Cost": 0, "Stress_Cost": 0.0, "Tags": "Growth|RPG"
+        },
+        {
+            "ID": "ACT_GM_GACHA", "Name": "아이템 뽑기", "Category": "GAME", 
+            "Media_Group": "GAME", "Intensity": 40, "Fun_Reward": 100.0, "Growth_Reward": 0.0, "Difficulty": 5, # 돈만 있으면 됨
+            "Cost": 3000, "Stress_Cost": -5.0, "Tags": "Gambling|Collection"
+        },
+        
+        # --- VIDEO (도파민 위주, 난이도 최하) ---
+        {
+            "ID": "ACT_MD_SHORT", "Name": "숏폼(틱톡/릴스)", "Category": "MEDIA", 
+            "Media_Group": "VIDEO", "Intensity": 60, "Fun_Reward": 70.0, "Growth_Reward": -5.0, "Difficulty": 5, # 뇌 빼고 보기 가능
+            "Cost": 0, "Stress_Cost": 5.0, "Tags": "Humor|Trend"
+        },
+        {
+            "ID": "ACT_MD_NETFLIX", "Name": "넷플릭스 정주행", "Category": "MEDIA", 
+            "Media_Group": "VIDEO", "Intensity": 40, "Fun_Reward": 40.0, "Growth_Reward": 2.0, "Difficulty": 10, 
+            "Cost": 0, "Stress_Cost": -10.0, "Tags": "Story|Relax"
+        },
+
+        # --- BOOK/STUDY (성장 위주, 난이도 최상) ---
+        {
+            "ID": "ACT_BK_STUDY", "Name": "전공 공부/독서", "Category": "WORK", 
+            "Media_Group": "BOOK", "Intensity": 85, "Fun_Reward": 5.0, "Growth_Reward": 80.0, "Difficulty": 75, # 지능/배경지식 필요
+            "Cost": -10, "Stress_Cost": 25.0, "Tags": "Knowledge|Future"
+        },
+        
+        # --- COMM (중간 성격) ---
+        {
+            "ID": "ACT_CM_BOARD", "Name": "커뮤니티 눈팅", "Category": "COMM", 
+            "Media_Group": "COMM", "Intensity": 35, "Fun_Reward": 20.0, "Growth_Reward": 5.0, "Difficulty": 20, # 밈 이해도 필요
+            "Cost": 0, "Stress_Cost": 5.0, "Tags": "Social|Info"
+        },
+
+        # --- LIFE ---
+        {
+            "ID": "ACT_LF_WORK", "Name": "집중 업무", "Category": "WORK", 
+            "Media_Group": "WORK", "Intensity": 90, "Fun_Reward": 0.0, "Growth_Reward": 40.0, "Difficulty": 60,
+            "Cost": -200, "Stress_Cost": 30.0, "Tags": "Responsibility"
+        },
+        {
+            "ID": "ACT_LF_REST", "Name": "멍때리기/휴식", "Category": "LIFE", 
+            "Media_Group": "LIFE", "Intensity": 5, "Fun_Reward": 5.0, "Growth_Reward": 5.0, "Difficulty": 0,
+            "Cost": 0, "Stress_Cost": -20.0, "Tags": "Relax"
+        },
     ]
     
-    df_act = pd.DataFrame(activities_data)
+    # 컬럼 순서 명시적 지정
+    cols = ["ID", "Name", "Category", "Media_Group", "Intensity", "Fun_Reward", "Growth_Reward", "Difficulty", "Cost", "Stress_Cost", "Tags"]
+    df_act = pd.DataFrame(activities_data, columns=cols)
     df_act.to_csv('data/activities.csv', index=False, encoding='utf-8-sig')
-    print("-> Created: data/activities.csv")
+    print("-> Updated: data/activities.csv with Media Hierarchy schema")
 
-    # 2. Time Slot Table Data
+    # 2. Time Slot Table (기존 유지)
     slots = []
     for i in range(96):
         hour = (i * 15) // 60
@@ -38,40 +88,19 @@ def create_initial_csvs():
         stress_mod = 1.0
         ad_efficiency = 1.0
         
-        if 0 <= hour < 7:     # 심야
-            context = "SLEEP"
-            stress_mod = 0.5
-            ad_efficiency = 0.1
-        elif 7 <= hour < 9:   # 출근
-            context = "COMMUTE_AM"
-            stress_mod = 1.5
-            ad_efficiency = 1.5 
-        elif 9 <= hour < 12:  # 오전 근무
-            context = "WORK_AM"
-            stress_mod = 1.2
-            ad_efficiency = 0.5
-        elif 12 <= hour < 13: # 점심
-            context = "LUNCH"
-            stress_mod = 0.8
-            ad_efficiency = 1.2
-        elif 13 <= hour < 18: # 오후 근무
-            context = "WORK_PM"
-            stress_mod = 1.3
-            ad_efficiency = 0.5
-        elif 18 <= hour < 20: # 퇴근
-            context = "COMMUTE_PM"
-            stress_mod = 1.4
-            ad_efficiency = 1.4
-        else:                 # 저녁 여가
-            context = "RELAX"
-            stress_mod = 0.9
-            ad_efficiency = 1.1
+        if 0 <= hour < 7:     context, stress_mod, ad_efficiency = "SLEEP", 0.5, 0.1
+        elif 7 <= hour < 9:   context, stress_mod, ad_efficiency = "COMMUTE_AM", 1.5, 1.5 
+        elif 9 <= hour < 12:  context, stress_mod, ad_efficiency = "WORK_AM", 1.2, 0.5
+        elif 12 <= hour < 13: context, stress_mod, ad_efficiency = "LUNCH", 0.8, 1.2
+        elif 13 <= hour < 18: context, stress_mod, ad_efficiency = "WORK_PM", 1.3, 0.5
+        elif 18 <= hour < 20: context, stress_mod, ad_efficiency = "COMMUTE_PM", 1.4, 1.4
+        else:                 context, stress_mod, ad_efficiency = "RELAX", 0.9, 1.1
             
         slots.append([i, hour, context, stress_mod, ad_efficiency])
     
     df_time = pd.DataFrame(slots, columns=["Time_Index", "Hour", "Context", "Stress_Mod", "Ad_Efficiency"])
     df_time.to_csv('data/time_slots.csv', index=False, encoding='utf-8-sig')
-    print("-> Created: data/time_slots.csv")
+    print("-> Updated: data/time_slots.csv")
 
 if __name__ == "__main__":
     create_initial_csvs()

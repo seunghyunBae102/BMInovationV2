@@ -53,9 +53,9 @@ run_btn = st.sidebar.button("🚀 Run Simulation", type="primary")
 
 st.sidebar.markdown("""
 ### ℹ️ About
-**Psy-Sim v1.0**
+**Psy-Sim v1.5**
 - **Engine:** Vectorized NumPy
-- **Logic:** Knapsack + Prospect Theory
+- **Logic:** Knapsack + Needs(Fun/Growth) + Inertia
 - **Context:** Attention Economy
 """)
 
@@ -72,7 +72,24 @@ with st.expander("📊 View Simulation Rules (Data Config)"):
     col1, col2 = st.columns(2)
     with col1:
         st.write("Reference: Activity Table")
-        st.dataframe(df_activities[['ID', 'Name', 'Category', 'Intensity', 'Base_Reward']])
+        
+        # [Fix] 컬럼 유무 확인하여 동적으로 표시 (v1.0 / v1.5 호환)
+        display_cols = ['ID', 'Name', 'Category', 'Intensity']
+        
+        # v1.0 호환
+        if 'Base_Reward' in df_activities.columns:
+            display_cols.append('Base_Reward')
+        
+        # v1.5 호환
+        if 'Fun_Reward' in df_activities.columns:
+            display_cols.append('Fun_Reward')
+        if 'Growth_Reward' in df_activities.columns:
+            display_cols.append('Growth_Reward')
+        if 'Difficulty' in df_activities.columns:
+            display_cols.append('Difficulty')
+
+        st.dataframe(df_activities[display_cols])
+        
     with col2:
         st.write("Reference: Time Slots (Sample)")
         st.dataframe(df_time_slots.head(10))
@@ -130,12 +147,22 @@ if run_btn:
     })
     
     # 스트레스와 매출 그래프 그리기
-    # Streamlit Native Chart 사용
     chart_data = df_logs.set_index("Time")[["Average Stress"]]
     st.line_chart(chart_data, color="#FF4B4B") # Red for Stress
     
     st.caption("Cumulative Revenue Growth")
     st.area_chart(df_logs.set_index("Time")[["Cumulative Revenue"]], color="#29B5E8")
+    
+    # [NEW] Needs Analysis (v1.5)
+    if 'avg_dopamine' in logs:
+        st.subheader("🧠 Psychological Needs Trends")
+        st.write("도파민(재미) vs 불안(성장)의 하루 변화")
+        df_needs = pd.DataFrame({
+            "Time": logs['time'],
+            "Avg Dopamine": logs['avg_dopamine'],
+            "Avg Anxiety": logs['avg_anxiety']
+        })
+        st.line_chart(df_needs.set_index("Time"))
 
     # 3. Activity Popularity (Bar Chart)
     st.subheader("🏆 Most Popular Activities")
@@ -152,31 +179,24 @@ if run_btn:
 
     # 4. Micro Analysis: Trait vs Result (Scatter Plot)
     st.subheader("🔬 Micro Analysis: Personality vs Wallet")
-    st.markdown("성실성(Conscientiousness)이 높은 유저가 돈을 더 많이 아꼈을까?")
     
     # Scatter Plot을 위한 데이터프레임 생성
-    # population['traits_big5'] -> [N, 5]. 1번 인덱스가 성실성.
-    # population['wallet'] -> [N, 1].
-    
-    # 샘플링 (너무 많으면 느리므로 1000개만)
     sample_size = min(n_agents, 1000)
     indices = np.random.choice(n_agents, sample_size, replace=False)
     
     df_micro = pd.DataFrame({
         "Conscientiousness": population['traits_big5'][indices, 1],
         "Openness": population['traits_big5'][indices, 0],
-        "Neuroticism": population['traits_big5'][indices, 4],
         "Final Wallet": population['wallet'][indices].flatten(),
         "Stress Level": population['state_stress'][indices].flatten()
     })
     
-    # Streamlit 내장 산점도
     st.scatter_chart(
         df_micro,
         x="Conscientiousness",
         y="Final Wallet",
         color="Stress Level",
-        size="Openness", # 개방성이 높을수록 점이 큼
+        size="Openness",
         use_container_width=True
     )
     
