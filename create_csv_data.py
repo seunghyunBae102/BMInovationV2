@@ -38,7 +38,7 @@ def create_initial_csvs():
         # --- VIDEO (도파민 위주, 난이도 최하) ---
         {
             "ID": "ACT_MD_SHORT", "Name": "숏폼(틱톡/릴스)", "Category": "MEDIA", 
-            "Media_Group": "VIDEO", "Intensity": 60, "Fun_Reward": 70.0, "Growth_Reward": -5.0, "Difficulty": 5, # 뇌 빼고 보기 가능
+            "Media_Group": "VIDEO", "Intensity": 20, "Fun_Reward": 95.0, "Growth_Reward": -5.0, "Difficulty": 5, # 뇌 빼고 보기 가능
             "Cost": 0, "Stress_Cost": 5.0, "Tags": "Humor|Trend"
         },
         {
@@ -80,27 +80,50 @@ def create_initial_csvs():
     df_act.to_csv('data/activities.csv', index=False, encoding='utf-8-sig')
     print("-> Updated: data/activities.csv with Media Hierarchy schema")
 
-    # 2. Time Slot Table (기존 유지)
-    slots = []
+    # 2. [NEW] Life Patterns Table
+    # 패턴 ID: 0(직장인), 1(학생), 2(프리랜서), 3(야간조)
+    patterns = []
+    
     for i in range(96):
         hour = (i * 15) // 60
-        context = "NORMAL"
-        stress_mod = 1.0
-        ad_efficiency = 1.0
         
-        if 0 <= hour < 7:     context, stress_mod, ad_efficiency = "SLEEP", 0.5, 0.1
-        elif 7 <= hour < 9:   context, stress_mod, ad_efficiency = "COMMUTE_AM", 1.5, 1.5 
-        elif 9 <= hour < 12:  context, stress_mod, ad_efficiency = "WORK_AM", 1.2, 0.5
-        elif 12 <= hour < 13: context, stress_mod, ad_efficiency = "LUNCH", 0.8, 1.2
-        elif 13 <= hour < 18: context, stress_mod, ad_efficiency = "WORK_PM", 1.3, 0.5
-        elif 18 <= hour < 20: context, stress_mod, ad_efficiency = "COMMUTE_PM", 1.4, 1.4
-        else:                 context, stress_mod, ad_efficiency = "RELAX", 0.9, 1.1
-            
-        slots.append([i, hour, context, stress_mod, ad_efficiency])
-    
-    df_time = pd.DataFrame(slots, columns=["Time_Index", "Hour", "Context", "Stress_Mod", "Ad_Efficiency"])
-    df_time.to_csv('data/time_slots.csv', index=False, encoding='utf-8-sig')
-    print("-> Updated: data/time_slots.csv")
+        # --- Pattern 0: 직장인 (Standard) ---
+        if 0 <= hour < 7:     ctx, s_mod, ad = "SLEEP", 0.5, 0.1
+        elif 7 <= hour < 9:   ctx, s_mod, ad = "COMMUTE", 1.5, 1.5 
+        elif 9 <= hour < 18:  ctx, s_mod, ad = "WORK", 1.3, 0.5
+        elif 18 <= hour < 20: ctx, s_mod, ad = "COMMUTE", 1.4, 1.4
+        else:                 ctx, s_mod, ad = "RELAX", 0.9, 1.2
+        patterns.append({"Pattern_ID": 0, "Time_Index": i, "Hour": hour, "Context": ctx, "Stress_Mod": s_mod, "Ad_Eff": ad})
+
+        # --- Pattern 1: 학생 (Student) ---
+        # 아침 일찍 등교, 수업 중 폰 압수(Ad효율 극악), 밤늦게까지 깨어있음
+        if 0 <= hour < 7:     ctx, s_mod, ad = "SLEEP", 0.5, 0.1
+        elif 7 <= hour < 8:   ctx, s_mod, ad = "COMMUTE", 1.2, 1.2
+        elif 8 <= hour < 16:  ctx, s_mod, ad = "SCHOOL", 1.4, 0.2 # 수업중
+        elif 16 <= hour < 22: ctx, s_mod, ad = "ACADEMY", 1.3, 0.8 # 학원/자습
+        else:                 ctx, s_mod, ad = "GAME_TIME", 0.8, 1.5 # 새벽 몰래 게임
+        patterns.append({"Pattern_ID": 1, "Time_Index": i, "Hour": hour, "Context": ctx, "Stress_Mod": s_mod, "Ad_Eff": ad})
+
+        # --- Pattern 2: 프리랜서/백수 (Free) ---
+        # 늦게 일어나고 낮에 놈
+        if 0 <= hour < 11:    ctx, s_mod, ad = "SLEEP", 0.4, 0.0
+        elif 11 <= hour < 18: ctx, s_mod, ad = "FREE_TIME", 0.8, 1.2 # 낮 게임
+        elif 18 <= hour < 24: ctx, s_mod, ad = "FREE_TIME", 0.9, 1.2
+        patterns.append({"Pattern_ID": 2, "Time_Index": i, "Hour": hour, "Context": ctx, "Stress_Mod": s_mod, "Ad_Eff": ad})
+        
+        # --- Pattern 3: 야간 근무자 (Night Shift) ---
+        # 낮에 자고 밤에 일함
+        if 9 <= hour < 17:    ctx, s_mod, ad = "SLEEP", 0.5, 0.1
+        elif 17 <= hour < 20: ctx, s_mod, ad = "FREE_TIME", 0.8, 1.2
+        elif 20 <= hour < 22: ctx, s_mod, ad = "COMMUTE", 1.2, 1.4
+        elif 22 <= hour < 24: ctx, s_mod, ad = "WORK", 1.4, 0.4
+        elif 0 <= hour < 6:   ctx, s_mod, ad = "WORK", 1.5, 0.4
+        else:                 ctx, s_mod, ad = "COMMUTE", 1.4, 1.4
+        patterns.append({"Pattern_ID": 3, "Time_Index": i, "Hour": hour, "Context": ctx, "Stress_Mod": s_mod, "Ad_Eff": ad})
+
+    df_patterns = pd.DataFrame(patterns)
+    df_patterns.to_csv('data/life_patterns.csv', index=False, encoding='utf-8-sig')
+    print("-> Created: data/life_patterns.csv (4 Patterns)")
 
 if __name__ == "__main__":
     create_initial_csvs()

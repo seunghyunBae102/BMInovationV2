@@ -2,21 +2,25 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import time
+import plotly.express as px
+import plotly.graph_objects as go
 
-# 기존 모듈 임포트
+# 모듈 임포트
 import genesis
 import psy_sim_config
 import engine
 import create_csv_data
+import inference
 import os
 
 # ==========================================
-# Streamlit Dashboard Configuration
+# Streamlit Configuration
 # ==========================================
 st.set_page_config(
-    page_title="Psy-Sim: Market Simulator",
+    page_title="Psy-Sim v2.2 Controller",
     page_icon="🧠",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # ==========================================
@@ -24,183 +28,159 @@ st.set_page_config(
 # ==========================================
 @st.cache_data
 def load_configs():
-    # 데이터 폴더가 없으면 생성
+    # 데이터 생성 확인
     if not os.path.exists('data/activities.csv'):
         create_csv_data.create_initial_csvs()
         
-    act = psy_sim_config.load_activity_table()
-    time_slots = psy_sim_config.load_time_slots()
-    return act, time_slots
+    # v2.2 호환 로더 사용
+    df_act = psy_sim_config.load_activity_table()
+    
+    # Life Pattern 데이터 로드
+    df_patterns, _, _ = psy_sim_config.load_life_patterns()
+    
+    return df_act, df_patterns
 
 # ==========================================
-# Sidebar: Simulation Parameters
+# Sidebar
 # ==========================================
-st.sidebar.title("🎮 Psy-Sim Controller")
+st.sidebar.title("🧠 Psy-Sim v2.2")
+st.sidebar.caption("Dynamic Economy & Social Simulator")
 st.sidebar.markdown("---")
 
-# 1. 에이전트 설정
-st.sidebar.subheader("Population Settings")
-n_agents = st.sidebar.slider("Number of Agents", min_value=100, max_value=20000, value=1000, step=100)
+# 1. Population Control
+st.sidebar.subheader("👥 Population")
+n_agents = st.sidebar.slider("Agent Count", 100, 20000, 5000, 100)
 
-# 2. 경제 설정 (추가 파라미터 예시)
-st.sidebar.subheader("Economy Settings")
-# 간단한 밸런스 조절을 위한 계수 (실제 엔진 연동은 추후 확장 가능)
-ad_revenue_mult = st.sidebar.slider("Ad Revenue Multiplier", 0.5, 2.0, 1.0)
+# 2. Event Injection Control (Dynamic World)
+st.sidebar.subheader("⚡ World Events")
+enable_maintenance = st.sidebar.checkbox("Trigger Server Maintenance (14:00)", value=False)
+enable_hottime = st.sidebar.checkbox("Trigger Hot Time (20:00)", value=True)
 
-# 3. 실행 버튼
+# 3. Execution
 st.sidebar.markdown("---")
 run_btn = st.sidebar.button("🚀 Run Simulation", type="primary")
 
-st.sidebar.markdown("""
-### ℹ️ About
-**Psy-Sim v1.5**
-- **Engine:** Vectorized NumPy
-- **Logic:** Knapsack + Needs(Fun/Growth) + Inertia
-- **Context:** Attention Economy
-""")
+# ==========================================
+# Main Layout
+# ==========================================
+st.title("📊 Psychological Market Simulator Dashboard")
+
+df_activities, df_patterns = load_configs()
+
+# Data Preview Tabs
+tab1, tab2 = st.tabs(["📂 Activity Data", "🧬 Life Patterns"])
+with tab1:
+    st.dataframe(df_activities, use_container_width=True)
+with tab2:
+    st.dataframe(df_patterns.head(10), use_container_width=True)
+    st.caption("*Showing first 10 rows of 96 ticks per pattern")
 
 # ==========================================
-# Main Page
-# ==========================================
-st.title("🧠 Psy-Sim: Psychological Market Simulator")
-st.markdown(f"Simulating **{n_agents:,}** unique personas based on Big5 traits & Attention Economy.")
-
-# Config 로드 및 표시
-df_activities, df_time_slots = load_configs()
-
-with st.expander("📊 View Simulation Rules (Data Config)"):
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("Reference: Activity Table")
-        
-        # [Fix] 컬럼 유무 확인하여 동적으로 표시 (v1.0 / v1.5 호환)
-        display_cols = ['ID', 'Name', 'Category', 'Intensity']
-        
-        # v1.0 호환
-        if 'Base_Reward' in df_activities.columns:
-            display_cols.append('Base_Reward')
-        
-        # v1.5 호환
-        if 'Fun_Reward' in df_activities.columns:
-            display_cols.append('Fun_Reward')
-        if 'Growth_Reward' in df_activities.columns:
-            display_cols.append('Growth_Reward')
-        if 'Difficulty' in df_activities.columns:
-            display_cols.append('Difficulty')
-
-        st.dataframe(df_activities[display_cols])
-        
-    with col2:
-        st.write("Reference: Time Slots (Sample)")
-        st.dataframe(df_time_slots.head(10))
-
-# ==========================================
-# Simulation Logic
+# Simulation Execution
 # ==========================================
 if run_btn:
-    status_text = st.empty()
+    # 1. Setup Events
+    events = {}
+    if enable_maintenance:
+        events[56] = {"Type": "SERVER_DOWN", "Target": "GAME", "Value": 0}
+        events[57] = {"Type": "SERVER_DOWN", "Target": "GAME", "Value": 0}
+    
+    if enable_hottime:
+        events[80] = {"Type": "HOT_TIME", "Target": "GAME", "Value": 3.0}
+
+    # 2. Generate Agents
+    with st.spinner(f"Creating {n_agents:,} Agents with Life Patterns..."):
+        population = genesis.create_agent_population(n_agents)
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Agents", f"{n_agents:,}")
+    col2.metric("Active Patterns", "4 Types")
+    col3.metric("Scheduled Events", len(events))
+    
+    # 3. Run Engine
     progress_bar = st.progress(0)
-    
-    # 1. Genesis (에이전트 생성)
-    status_text.write("🧬 Generating Synthetic Population...")
-    population = genesis.create_agent_population(n_agents)
-    progress_bar.progress(20)
-    
-    time.sleep(0.5) # UX를 위한 짧은 대기
-    
-    # 2. Run Engine (시뮬레이션)
+    status_text = st.empty()
     status_text.write("⚙️ Running Physics Engine (24h Loop)...")
     
-    # 엔진 실행 (Phase 4의 함수 사용)
-    # population 딕셔너리는 Mutable이므로 내부 값이 계속 업데이트됨
-    start_time = time.time()
-    logs = engine.run_simulation(population, df_activities, df_time_slots)
-    end_time = time.time()
+    start_t = time.time()
+    logs = engine.run_simulation(population, df_activities, events=events)
+    end_t = time.time()
     
     progress_bar.progress(100)
-    status_text.success(f"✅ Simulation Complete in {end_time - start_time:.4f} seconds!")
+    status_text.success(f"Simulation finished in {end_t - start_t:.2f}s")
     
     # ==========================================
-    # Results Visualization
+    # Visualizations
     # ==========================================
     st.markdown("---")
-    st.subheader("📈 Simulation Report")
-
-    # 1. Summary Metrics
-    col1, col2, col3, col4 = st.columns(4)
-    total_revenue = logs['total_revenue'][-1]
-    avg_stress = logs['avg_stress'][-1]
     
-    col1.metric("Total Revenue", f"{total_revenue:,.0f} G", delta="Daily Gross")
-    col2.metric("Avg Stress", f"{avg_stress:.1f} / 100", delta_color="inverse")
-    col3.metric("Simulated Time", "24 Hours")
-    col4.metric("Agents", f"{n_agents:,}")
+    # Metrics
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Revenue", f"{logs['total_revenue'][-1]:,.0f} G")
+    m2.metric("Avg Stress", f"{logs['avg_stress'][-1]:.1f}")
+    m3.metric("Avg Dopamine", f"{logs['avg_dopamine'][-1]:.1f}")
+    m4.metric("Avg Anxiety", f"{logs['avg_anxiety'][-1]:.1f}")
 
-    # 2. Time Series Analysis (Line Chart)
-    st.subheader("⏱️ 24h Trends: Stress vs Revenue")
-    
-    # 로그 데이터를 DataFrame으로 변환
+    # --- Chart 1: Main Trends ---
+    st.subheader("📈 Macro Trends (24 Hours)")
     df_logs = pd.DataFrame({
         "Time": logs['time'],
-        "Cumulative Revenue": logs['total_revenue'],
-        "Average Stress": logs['avg_stress']
+        "Revenue": logs['total_revenue'],
+        "Stress": logs['avg_stress'],
+        "Dopamine": logs['avg_dopamine']
     })
     
-    # 스트레스와 매출 그래프 그리기
-    chart_data = df_logs.set_index("Time")[["Average Stress"]]
-    st.line_chart(chart_data, color="#FF4B4B") # Red for Stress
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df_logs['Time'], y=df_logs['Stress'], name="Stress", line=dict(color='red')))
+    fig.add_trace(go.Scatter(x=df_logs['Time'], y=df_logs['Dopamine'], name="Dopamine", line=dict(color='green')))
+    fig.update_layout(title="Stress vs Dopamine Levels", xaxis_title="Time", hovermode="x unified")
+    st.plotly_chart(fig, use_container_width=True)
     
-    st.caption("Cumulative Revenue Growth")
-    st.area_chart(df_logs.set_index("Time")[["Cumulative Revenue"]], color="#29B5E8")
+    # --- Chart 2: Life Pattern Stress Comparison ---
+    st.subheader("👥 Stress by Life Pattern")
+    pattern_names = {0:"Office", 1:"Student", 2:"Free", 3:"Night"}
+    df_pattern_stress = pd.DataFrame(logs['pattern_stress'])
+    df_pattern_stress['Time'] = logs['time']
     
-    # [NEW] Needs Analysis (v1.5)
-    if 'avg_dopamine' in logs:
-        st.subheader("🧠 Psychological Needs Trends")
-        st.write("도파민(재미) vs 불안(성장)의 하루 변화")
-        df_needs = pd.DataFrame({
-            "Time": logs['time'],
-            "Avg Dopamine": logs['avg_dopamine'],
-            "Avg Anxiety": logs['avg_anxiety']
-        })
-        st.line_chart(df_needs.set_index("Time"))
+    fig_p = go.Figure()
+    for pid, name in pattern_names.items():
+        if pid in df_pattern_stress.columns:
+            fig_p.add_trace(go.Scatter(x=df_pattern_stress['Time'], y=df_pattern_stress[pid], name=name))
+    fig_p.update_layout(title="Stress Levels per Pattern", xaxis_title="Time")
+    st.plotly_chart(fig_p, use_container_width=True)
 
-    # 3. Activity Popularity (Bar Chart)
-    st.subheader("🏆 Most Popular Activities")
+    # --- Chart 3: Social Viral Trends ---
+    st.subheader("🔥 Social Viral Trends (Bandwagon Effect)")
+    viral_data = np.array(logs['viral_trends'])
+    df_viral = pd.DataFrame(viral_data, columns=inference.MEDIA_TYPES)
+    df_viral['Time'] = logs['time']
     
-    # 활동별 카운트 매핑
+    fig_v = px.line(df_viral, x='Time', y=inference.MEDIA_TYPES, title="Media Trend Scores Over Time")
+    
+    # [FIX] 이벤트 마커 표시 (Categorical Axis 호환성 수정)
+    # annotation_text를 add_vline에 직접 넣으면 int+str 에러 발생함.
+    # 별도의 add_annotation으로 분리하여 처리.
+    if enable_maintenance:
+        fig_v.add_vline(x="14:00", line_dash="dash", line_color="red")
+        fig_v.add_annotation(x="14:00", y=1.05, yref="paper", text="Maintenance", showarrow=False, font=dict(color="red"))
+        
+    if enable_hottime:
+        fig_v.add_vline(x="20:00", line_dash="dash", line_color="gold")
+        fig_v.add_annotation(x="20:00", y=1.05, yref="paper", text="Hot Time", showarrow=False, font=dict(color="gold"))
+        
+    st.plotly_chart(fig_v, use_container_width=True)
+
+    # --- Chart 4: Activity Distribution ---
+    st.subheader("🏆 Activity Popularity")
     action_counts = logs['action_counts']
-    df_popularity = pd.DataFrame({
+    df_pop = pd.DataFrame({
         "Activity": df_activities['Name'],
         "Category": df_activities['Category'],
         "Count": action_counts
-    }).sort_values("Count", ascending=False)
+    }).sort_values("Count", ascending=True)
     
-    st.bar_chart(df_popularity.set_index("Activity")["Count"])
-
-    # 4. Micro Analysis: Trait vs Result (Scatter Plot)
-    st.subheader("🔬 Micro Analysis: Personality vs Wallet")
-    
-    # Scatter Plot을 위한 데이터프레임 생성
-    sample_size = min(n_agents, 1000)
-    indices = np.random.choice(n_agents, sample_size, replace=False)
-    
-    df_micro = pd.DataFrame({
-        "Conscientiousness": population['traits_big5'][indices, 1],
-        "Openness": population['traits_big5'][indices, 0],
-        "Final Wallet": population['wallet'][indices].flatten(),
-        "Stress Level": population['state_stress'][indices].flatten()
-    })
-    
-    st.scatter_chart(
-        df_micro,
-        x="Conscientiousness",
-        y="Final Wallet",
-        color="Stress Level",
-        size="Openness",
-        use_container_width=True
-    )
-    
-    st.info("💡 Tip: 점의 색깔은 스트레스 수치, 크기는 개방성(Openness)을 의미합니다.")
+    fig_bar = px.bar(df_pop, x="Count", y="Activity", color="Category", orientation='h', title="Total Actions Performed")
+    st.plotly_chart(fig_bar, use_container_width=True)
 
 else:
-    st.info("👈 Please set parameters in the sidebar and click 'Run Simulation'")
+    st.info("👈 Set simulation parameters and click **Run Simulation** to start.")
